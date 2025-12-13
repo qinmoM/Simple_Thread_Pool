@@ -23,4 +23,18 @@ int main()
 
     threadPool.shutdown();
     return 0;
+
+    /*
+    output:
+
+    0
+    1
+    2
+    3
+    
+    hello world.
+    hello world.
+    hello world.
+    hello world.
+    */
 }
