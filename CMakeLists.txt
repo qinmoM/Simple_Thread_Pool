@@ -18,4 +18,5 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 # 添加源文件到项目
-add_executable(${PROJECT_NAME} ${SOURCES} ./main.cpp)
+#add_executable(${PROJECT_NAME} ${SOURCES} ./main.cpp)
+add_executable(${PROJECT_NAME} ${SOURCES})
