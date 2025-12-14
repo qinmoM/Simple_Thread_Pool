@@ -7,14 +7,16 @@
 /**         test result
  * 
  * debug output:
- * ordinary time: 1508368   (1508ms)
- * thread time: 197471      (197ms)
- * thread pool time: 208288 (208ms)
+ * ordinary time: 1501880                   (1501ms)
+ * thread time: 206011                      (206ms)
+ * thread pool time: 211305                 (211ms)
+ * thread pool time(Uninitialized): 207068  (207ms)
  * 
  * release output:
- * ordinary time: 185416    (185ms)
- * thread time: 34774       (34ms)
- * thread pool time: 42568  (42ms)
+ * ordinary time: 200945                    (201ms)
+ * thread time: 37036                       (37ms)
+ * thread pool time: 44626                  (45ms)
+ * thread pool time(Uninitialized): 39151   (39ms)
 */
 
 
@@ -40,6 +42,7 @@ int main()
     std::vector<std::vector<int>> data1(10, std::vector<int>(1000000, 0));
     std::vector<std::vector<int>> data2(10, std::vector<int>(1000000, 0));
     std::vector<std::vector<int>> data3(10, std::vector<int>(1000000, 0));
+    std::vector<std::vector<int>> data4(10, std::vector<int>(1000000, 0));
     for (int i = 0; i < 1000000; ++i)
     {
         for (int j = 0; j < 10; ++j)
@@ -47,6 +50,7 @@ int main()
             data1[j][i] = i >> 4 + i << 4 + j << 2 + j >> 2;
             data2[j][i] = data1[j][i];
             data3[j][i] = data1[j][i];
+            data4[j][i] = data1[j][i];
         }
     }
     // ordinary
@@ -78,5 +82,14 @@ int main()
     }
     threadpool.shutdown();
     std::cout << "thread pool time: " << std::chrono::duration_cast<std::chrono::microseconds>(clock::now() - start).count() << std::endl;
+    // thread pool(Uninitialized)
+    qinmo::ThreadPool threadpool_u(10);
+    start = clock::now();
+    for (int i = 0; i < 10; ++i)
+    {
+        threadpool_u.submit(Task(), data4[i]);
+    }
+    threadpool_u.shutdown();
+    std::cout << "thread pool time(Uninitialized): " << std::chrono::duration_cast<std::chrono::microseconds>(clock::now() - start).count() << std::endl;
     return 0;
 }
