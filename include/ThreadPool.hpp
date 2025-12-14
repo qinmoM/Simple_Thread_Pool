@@ -1,3 +1,11 @@
+/**
+ * @file ThreadPool.hpp
+ * @brief A Simple C++11 Thread Pool Implementation
+ * 
+ * @author qinmoM
+ * @github https://github.com/qinmoM/Simple_Thread_Pool
+ */
+
 #pragma once
 
 #include <functional>
@@ -10,31 +18,77 @@
 #include <stdexcept>
 #include <condition_variable>
 
+/// @namespace qinmo
 namespace qinmo
 {
 
 class ThreadPool
 {
 public:
+    /// @brief Construction
+    /// @param num_thread The number of threads
     explicit ThreadPool(std::size_t num_thread);
+
+    /// @brief Destruction
     ~ThreadPool();
+
 public:
+/*
+            Adding tasks of the thread pool.
+*/
+
+    /// @brief add a task to be executed, and get its return value
+    /// @tparam F ordinary function, lambda or functor
+    /// @tparam ...Args any number of parameters
+    /// @param f rvalue reference of the task function
+    /// @param ...args parameters passed to task function
+    /// @return std::future object that holds the return value of task function
+    /// @throw std::runtime_error if the thread pool has been closed
     template<typename F, typename... Args>
     auto submit(F&& f, Args&&... args) -> std::future<decltype(f(args...))>;
 
+
+/*
+            Closing of the thread pool.
+*/
+
+    /// @brief close the active thread pool
+    /// @details complete all tasks
     void shutdown();
+
+    /// @brief close the active thread pool
+    /// @details abandon the tasks that have not yet been executed
     void shutdownNow();
 
+
+/*
+            Status of the thread pool.
+*/
+
+    /// @brief check if the thread pool has been closed
+    /// @return return true if the thread pool has been closed, false otherwise
+    /// @details this function will block. For debugging purpose only.
     bool isShutdown();
+
+    /// @brief get the number of threads
     std::size_t getThreadCount() const;
+
+    /// @brief get the number of tasks in the message queue
+    /// @details this function will block. For debugging purpose only.
     std::size_t getQueueCount();
+
 private:
     std::vector<std::thread> threads_;
     std::queue<std::function<void()>> queue_;
     std::mutex mutex_;
     std::condition_variable cond_;
     bool shutdown_;
+
 };
+
+/*
+                Implementation
+*/
 
 ThreadPool::ThreadPool(std::size_t num_thread)
     : shutdown_(false)
