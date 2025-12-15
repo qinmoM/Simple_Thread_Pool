@@ -32,6 +32,12 @@ public:
     /// @brief Destruction
     ~ThreadPool();
 
+    /// @brief Copy and move constructors and assignment operators are deleted
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool(ThreadPool&&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
+    ThreadPool& operator=(ThreadPool&&) = delete;
+
 public:
 /*
             Adding tasks of the thread pool.
