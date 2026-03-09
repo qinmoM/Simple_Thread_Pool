@@ -3,25 +3,32 @@
 
 int main()
 {
+    // create a thread pool with a maximum of 4 concurrent threads
     qinmo::ThreadPool threadPool(4);
 
-    std::vector<std::future<int>> result;
+
+    // submit task (non-blocking)
     for (int i = 0; i < 4; ++i)
-    {
+        threadPool.submit([]() -> void { std::cout << "hello world.\n"; });
+
+
+    // create an array for asynchronous retrieval of return values
+    std::vector<std::future<int>> result;
+
+    // submit four rasks to the thread pool (non-blocking)
+    for (int i = 0; i < 4; ++i)
         result.push_back(std::move(threadPool.submit([](int i) -> int { return i; } , i)));
-    }
+
+    // print their return values (blocking)
     for (auto&& fut : result)
-    {
         std::cout << fut.get() << "\n";
-    }
+
     std::cout << std::endl;
 
-    for (int i = 0; i < 4; ++i)
-    {
-        threadPool.submit([]() -> void { std::cout << "hello world.\n"; });
-    }
 
+    // manual shutdown
     threadPool.shutdown();
+
     return 0;
 
     /*
