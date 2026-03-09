@@ -96,7 +96,7 @@ private:
                 Implementation
 */
 
-ThreadPool::ThreadPool(std::size_t num_thread)
+inline ThreadPool::ThreadPool(std::size_t num_thread)
     : shutdown_(false)
 {
     for (int i = 0; i < num_thread; ++i)
@@ -121,7 +121,7 @@ ThreadPool::ThreadPool(std::size_t num_thread)
     }
 }
 
-ThreadPool::~ThreadPool()
+inline ThreadPool::~ThreadPool()
 {
     shutdown();
 }
@@ -141,7 +141,7 @@ auto ThreadPool::submit(F&& f, Args&&... args) -> std::future<decltype(f(args...
     return res;
 }
 
-void ThreadPool::shutdown()
+inline void ThreadPool::shutdown()
 {
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -156,7 +156,7 @@ void ThreadPool::shutdown()
     }
 }
 
-void ThreadPool::shutdownNow()
+inline void ThreadPool::shutdownNow()
 {
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -173,18 +173,18 @@ void ThreadPool::shutdownNow()
     }
 }
 
-bool ThreadPool::isShutdown()
+inline bool ThreadPool::isShutdown()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return shutdown_;
 }
 
-std::size_t ThreadPool::getThreadCount() const
+inline std::size_t ThreadPool::getThreadCount() const
 {
     return threads_.size();
 }
 
-std::size_t ThreadPool::getQueueCount()
+inline std::size_t ThreadPool::getQueueCount()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return queue_.size();
