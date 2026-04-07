@@ -33,15 +33,14 @@ int main()
 
     /*
     output:
-
-    0
-    1
-    2
-    3
     
     hello world.
     hello world.
     hello world.
     hello world.
+    0
+    1
+    2
+    3
     */
 }

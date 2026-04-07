@@ -190,4 +190,4 @@ inline std::size_t ThreadPool::getQueueCount()
     return queue_.size();
 }
 
-}
+} // namespace qinmo
