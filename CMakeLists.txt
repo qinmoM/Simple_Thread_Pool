@@ -19,4 +19,15 @@ file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 # 添加源文件到项目
 #add_executable(${PROJECT_NAME} ${SOURCES} ./main.cpp)
-add_executable(${PROJECT_NAME} ${SOURCES})
+# add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} ./main.cpp)
+
+
+add_subdirectory(
+    external/qinmo_tool
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        qinmo_tool
+)

@@ -22,6 +22,12 @@
 namespace qinmo
 {
 
+/**
+ * @brief A conventional thread pool based mutex and condition.
+ * 
+ * The task queue uses std::mutex + std::queue, with no upper limit on queue capacity.
+ * Suitable for most scenes. Simple and Stable.
+ */
 class ThreadPool
 {
 public:
