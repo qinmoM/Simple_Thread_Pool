@@ -1,4 +1,5 @@
 #include "ThreadPool.hpp"
+#include "lockfree/MPMCBounded.h"
 #include <iostream>
 
 int main()
