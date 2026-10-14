@@ -55,6 +55,8 @@ public:
 
         ;
     }
+    MPMCBounded(const MPMCBounded&) = delete;
+    MPMCBounded& operator=(const MPMCBounded&) = delete;
 
     template <typename... Args>
     bool emplace(Args&&... args) noexcept
@@ -87,6 +89,8 @@ public:
 
     bool push(const T& val) noexcept
     {
+        static_assert(std::is_nothrow_copy_constructible<T>::value, "T must be nothrow copy constructible");
+
         return emplace(val);
     }
 
