@@ -55,6 +55,14 @@ public:
 
         ;
     }
+    ~MPMCBounded()
+    {
+        for (int i = 0; i < capacity_; ++i)
+            storage_[i].~StorageCell();
+
+        allocator_.deallocate(storage_, capacity_ + 1);
+    }
+
     MPMCBounded(const MPMCBounded&) = delete;
     MPMCBounded& operator=(const MPMCBounded&) = delete;
 
