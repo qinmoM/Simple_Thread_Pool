@@ -23,7 +23,7 @@ struct StorageCell
     template <typename... Args>
     void construct(Args&&... args) noexcept
     {
-        static_assert(std::is_nothrow_constructible<T>::value, "T must be nothrow constructible");
+        static_assert(std::is_nothrow_constructible<T, Args&&...>::value, "T must be nothrow constructible");
         new (storage_) T(std::forward<Args>(args)...);
     }
 
@@ -35,7 +35,7 @@ struct StorageCell
 
     T&& move() noexcept { return reinterpret_cast<T&&>(storage_); }
 
-    alignas(hardwareInterferenceSize) std::atomic<std::size_t> sign_;
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> sign_{0};
     alignas(T) unsigned char storage_[sizeof(T)];
 };
 
@@ -50,17 +50,32 @@ public:
         , head_(0)
         , tail_(0)
     {
+        static_assert(
+            (sizeof(StorageCell<T>) % hardwareInterferenceSize == 0) &&
+            (alignof(StorageCell<T>) == hardwareInterferenceSize)    &&
+            (sizeof(MPMCBounded) % hardwareInterferenceSize == 0),
+            "error alignment"
+        );
+
         if (capacity_ < 1)
             throw std::invalid_argument("capacity < 1");
 
-        ;
+        storage_ = allocator_.allocate(capacity);
+        if (0 != reinterpret_cast<std::size_t>(storage_) % alignof(StorageCell<T>))
+        {
+            allocator_.deallocate(storage_, capacity);
+            throw std::bad_alloc();
+        }
+
+        for (int i = 0; i < capacity; ++i)
+            new (&storage_[i]) StorageCell<T>();
     }
     ~MPMCBounded()
     {
         for (int i = 0; i < capacity_; ++i)
             storage_[i].~StorageCell();
 
-        allocator_.deallocate(storage_, capacity_ + 1);
+        allocator_.deallocate(storage_, capacity_);
     }
 
     MPMCBounded(const MPMCBounded&) = delete;
@@ -74,13 +89,13 @@ public:
         std::size_t currTail = tail_.load(std::memory_order_acquire);
         while (true)
         {
-            StorageCell<T>& storage = storage_[index(tail_)];
+            StorageCell<T>& storage = storage_[index(currTail)];
             if (storage.sign_.load(std::memory_order_acquire) == turn(currTail) * 2)
             {
-                if (tail_.compare_exchange_strong(tail, tail + 1))
+                if (tail_.compare_exchange_strong(currTail, currTail + 1))
                 {
                     storage.construct(std::forward<Args>(args)...);
-                    storage.sign_.store(turn(tail) * 2 + 1, std::memory_order_release);
+                    storage.sign_.store(turn(currTail) * 2 + 1, std::memory_order_release);
                     return true;
                 }
             }
@@ -115,6 +130,8 @@ public:
 
     bool pop(T& val) noexcept
     {
+        static_assert(std::is_nothrow_assignable<T&, T&&>::value, "T must be move assignable");
+
         std::size_t currHead = head_.load(std::memory_order_acquire);
         while (true)
         {
