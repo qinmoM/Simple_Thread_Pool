@@ -41,8 +41,78 @@ struct StorageCell
 
 
 
+template <typename T>
 class MPMCBounded
 {
 public:
+    MPMCBounded(std::size_t capacity)
+        : capacity_(capacity)
+        , head_(0)
+        , tail_(0)
+    {
+        if (capacity_ < 1)
+            throw std::invalid_argument("capacity < 1");
+
+        ;
+    }
+
+    template <typename... Args>
+    bool emplace(Args&&... args) noexcept
+    {
+        static_assert(std::is_nothrow_constructible<T, Args&&...>::value, "T must be nothrow constructible with Args...");
+
+        std::size_t currTail = tail_.load(std::memory_order_acquire);
+        while (true)
+        {
+            StorageCell<T>& storage = storage_[index(tail_)];
+            if (storage.sign_.load(std::memory_order_acquire) == turn(currTail) * 2)
+            {
+                if (tail_.compare_exchange_strong(tail, tail + 1))
+                {
+                    storage.construct(std::forward<Args>(args)...);
+                    storage.sign_.store(turn(tail) * 2 + 1, std::memory_order_release);
+                    return true;
+                }
+            }
+            else
+            {
+                std::size_t preTail = currTail;
+                currTail = tail_.load(std::memory_order_acquire);
+
+                if (currTail == preTail)
+                    return false;
+            }
+        }
+    }
+
+    bool push(const T& val) noexcept
+    {
+        return emplace(val);
+    }
+
+    template <
+        typename U,
+        typename std::enable_if<
+            std::is_nothrow_constructible<T, U&&>::value
+        , int>::type = 0
+    >
+    bool push(U&& val) noexcept
+    {
+        return emplace(std::forward<U>(val));
+    }
+
+    bool pop(T& val) noexcept;
+
 private:
+    constexpr std::size_t index(std::size_t index) const noexcept { return index % capacity_; }
+    constexpr std::size_t turn(std::size_t index) const noexcept { return index / capacity_; }
+
+private:
+
+    const std::size_t capacity_;
+    StorageCell<T>* storage_;
+    qinmo::allocator<StorageCell<T>> allocator_;
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> head_;
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> tail_;
+
 };
