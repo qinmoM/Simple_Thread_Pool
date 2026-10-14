@@ -105,7 +105,32 @@ public:
         return emplace(std::forward<U>(val));
     }
 
-    bool pop(T& val) noexcept;
+    bool pop(T& val) noexcept
+    {
+        std::size_t currHead = head_.load(std::memory_order_acquire);
+        while (true)
+        {
+            StorageCell<T>& storage = storage_[index(currHead)];
+            if (storage.sign_.load(std::memory_order_acquire) == turn(currHead) * 2 + 1)
+            {
+                if (head_.compare_exchange_strong(currHead, currHead + 1))
+                {
+                    val = storage.move();
+                    storage.destroy();
+                    storage.sign_.store(2 * (currHead + 1), std::memory_order_release);
+                    return true;
+                }
+            }
+            else
+            {
+                std::size_t preHead = currHead;
+                currHead = head_.load(std::memory_order_acquire);
+
+                if (currHead == preHead)
+                    return false;
+            }
+        }
+    }
 
 private:
     constexpr std::size_t index(std::size_t index) const noexcept { return index % capacity_; }
