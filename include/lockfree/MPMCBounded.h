@@ -142,7 +142,7 @@ public:
                 {
                     val = storage.move();
                     storage.destroy();
-                    storage.sign_.store(2 * (currHead + 1), std::memory_order_release);
+                    storage.sign_.store(2 * (turn(currHead) + 1), std::memory_order_release);
                     return true;
                 }
             }
