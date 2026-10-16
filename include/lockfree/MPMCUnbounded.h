@@ -11,12 +11,13 @@ template <typename T>
 class MPMCUnbounded
 {
 public:
-    MPMCUnbounded(std::size_t capacity)
-        , capacity_(capacity)
+    MPMCUnbounded(std::size_t blockSize)
+        : blockSize_(blockSize)
         , index_(0)
-        , size_(1)
     {
-        queues_.emplace(capacity);
+        queues_.emplace_back<MPMCBounded<T>>(
+            qinmo::make_unique(blockSize)
+        );
     }
 
     MPMCUnbounded(const MPMCUnbounded&) = delete;
@@ -29,8 +30,11 @@ public:
 
         while (true)
         {
-            if (queues_[index].emplace(std::forward<Args>(args)...))
+            if (queues_[index]->emplace(std::forward<Args>(args)...))
+            {
+                updateIndex(index);
                 return true;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(mutex_);
@@ -42,10 +46,15 @@ public:
                     continue;
                 }
 
-                if (queues_[index].emplace(std::forward<Args>(args)...))
+                if (queues_[index]->emplace(std::forward<Args>(args)...))
+                {
+                    updateIndex(index);
                     return true;
+                }
                 else
+                {
                     toNext(index);
+                }
             }
         }
     }
@@ -61,22 +70,39 @@ public:
 
         while (true)
         {
-            if (queues_[index].pop(val))
+            if (queues_[index]->pop(val))
                 return true;
 
             if (0 == index)
                 return false;
 
-            index_.compare_exchange_strong(index, index - 1);
+            if (index_.compare_exchange_strong(index, index - 1,
+                std::memory_order_relaxed,
+                std::memory_order_relaxed))
+            {
+                --index;
+            }
         }
     }
 
 private:
+    void updateIndex(std::size_t index)
+    {
+        std::size_t curr = index_.load(std::memory_order_relaxed);
+        while (curr < index &&
+            !index_.compare_exchange_weak(curr, index,
+                std::memory_order_release,
+                std::memory_order_relaxed)
+        ) { }
+    }
+
     void toNext(std::size_t index)
     {
         if (index + 1 == queues_.size())
         {
-            queues_.emplace(capacity_);
+            queues_.emplace_back<MPMCBounded<T>>(
+                qinmo::make_unique(blockSize)
+            );
             index_.compare_exchange_strong(index, index + 1);
         }
     }
@@ -84,7 +110,7 @@ private:
 private:
     std::vector<std::unique_ptr<MPMCBounded<T>>> queues_;
     std::atomic<std::size_t> index_;
-    const std::size_t capacity_;
+    const std::size_t blockSize_;
 
     std::mutex mutex_;
 };
