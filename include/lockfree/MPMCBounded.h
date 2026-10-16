@@ -59,6 +59,8 @@ public:
 
         if (capacity_ < 1)
             throw std::invalid_argument("capacity < 1");
+        if (!qinmo::isPowerOfTwo(capacity_))
+            throw std::invalid_argument("capacity must be power of 2");
 
         storage_ = allocator_.allocate(capacity);
         if (0 != reinterpret_cast<std::size_t>(storage_) % alignof(StorageCell<T>))
