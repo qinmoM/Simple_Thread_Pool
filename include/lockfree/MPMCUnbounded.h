@@ -1,27 +1,33 @@
 #pragma once
 
 #include "MPMCBounded.h"
-#include <vector>
 #include <mutex>
 
 namespace qinmo
 {
 
 template <typename T>
-class MPMCUnbounded
+class MPMCUnbounded_false
 {
 public:
-    MPMCUnbounded(std::size_t blockSize)
+    MPMCUnbounded_false(std::size_t blockSize, std::size_t maxBlockNum = 1024)
         : blockSize_(blockSize)
+        , maxBlockNum_(maxBlockNum)
         , index_(0)
+        , size_(1)
     {
-        queues_.emplace_back<MPMCBounded<T>>(
-            qinmo::make_unique(blockSize)
-        );
+        queues_ = new std::unique_ptr<MPMCBounded<T>>[maxBlockNum];
+
+        queues_[0] = qinmo::make_unique<MPMCBounded<T>>(blockSize);
     }
 
-    MPMCUnbounded(const MPMCUnbounded&) = delete;
-    MPMCUnbounded& operator=(const MPMCUnbounded&) = delete;
+    ~MPMCUnbounded_false()
+    {
+        delete[] queues_;
+    }
+
+    MPMCUnbounded_false(const MPMCUnbounded_false&) = delete;
+    MPMCUnbounded_false& operator=(const MPMCUnbounded_false&) = delete;
 
     template <typename... Args>
     bool emplace(Args&&... args)
@@ -53,7 +59,11 @@ public:
                 }
                 else
                 {
-                    toNext(index);
+                    std::size_t size = size_.load(std::memory_order_acquire);
+                    if (size == maxBlockNum_)
+                        return false;
+
+                    toNext(index, size);
                 }
             }
         }
@@ -96,21 +106,22 @@ private:
         ) { }
     }
 
-    void toNext(std::size_t index)
+    void toNext(std::size_t index, std::size_t size)
     {
-        if (index + 1 == queues_.size())
+        if (index + 1 == size)
         {
-            queues_.emplace_back<MPMCBounded<T>>(
-                qinmo::make_unique(blockSize)
-            );
+            queues_[size_] = qinmo::make_unique<MPMCBounded<T>>(blockSize_);
+            size_.store(size + 1, std::memory_order_release);
             index_.compare_exchange_strong(index, index + 1);
         }
     }
 
 private:
-    std::vector<std::unique_ptr<MPMCBounded<T>>> queues_;
+    std::unique_ptr<MPMCBounded<T>>* queues_;
+    std::atomic<std::size_t> size_;
     std::atomic<std::size_t> index_;
     const std::size_t blockSize_;
+    const std::size_t maxBlockNum_;
 
     std::mutex mutex_;
 };
