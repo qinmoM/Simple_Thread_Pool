@@ -1,5 +1,5 @@
 #include "ThreadPool.hpp"
-#include "lockfree/MPMCUnbounded.h"
+#include "lockfree/MPMCUnbounded_false.h"
 #include <iostream>
 #include <windows.h>
 
@@ -49,41 +49,126 @@ int main()
 
     //     Sleep(1000);
     // }
-    MPMCBounded<int> q(3);
-    std::atomic<bool> stop(false);
-    int i = 0;
 
+
+    // MPMCBounded<int> q(3);
+    // std::atomic<bool> stop(false);
+    // int i = 0;
+    //
+    // std::thread th1(
+    //     [&q, &i, &stop]() -> void
+    //     {
+    //         while (!stop)
+    //         {
+    //             if (q.push(i++))
+    //                 qinmo::println("success");
+    //             else
+    //                 qinmo::println("failed");
+    //
+    //             Sleep(1000);
+    //         }
+    //     }
+    // );
+    // std::thread th2(
+    //     [&q, &stop]() -> void
+    //     {
+    //         while (!stop)
+    //         {
+    //             int temp = 0;
+    //             while (!q.pop(temp));
+    //             qinmo::println(temp);
+    //
+    //             Sleep(1100);
+    //         }
+    //     }
+    // );
+    //
+    // while (!stop);
+    // th1.join();
+    // th2.join();
+
+
+    // qinmo::MPMCUnbounded_false<int> queue(4);
+    // for (int i = 0; i < 200; ++i)
+    // {
+    //     if (!queue.push(i))
+    //         qinmo::println("false");
+    // }
+
+    // int i = 0;
+    // while (true)
+    // {
+    //     int temp = 0;
+    //     if (!queue.pop(temp))
+    //         break;
+
+    //     qinmo::println(temp, " num=", ++i);
+    // }
+
+    qinmo::MPMCUnbounded_false<int> q(8);
+    std::atomic<int> i{0};
     std::thread th1(
-        [&q, &i, &stop]() -> void
+        [&]() -> void
         {
-            while (!stop)
+            while (true)
             {
-                if (q.push(i++))
-                    qinmo::println("success");
-                else
-                    qinmo::println("failed");
-
-                Sleep(1000);
+                q.push(++i);
+                Sleep(300);
             }
         }
     );
     std::thread th2(
-        [&q, &stop]() -> void
+        [&]() -> void
         {
-            while (!stop)
+            while (true)
             {
-                int temp = 0;
-                while (!q.pop(temp));
-                qinmo::println(temp);
-
-                Sleep(1100);
+                q.push(++i);
+                Sleep(300);
+            }
+        }
+    );
+    std::thread th3(
+        [&]() -> void
+        {
+            while (true)
+            {
+                q.push(++i);
+                Sleep(300);
             }
         }
     );
 
-    while (!stop);
+    std::thread th4(
+        [&]() -> void
+        {
+            qinmo::println("begin:");
+            Sleep(1000);
+            int temp = 0;
+            while (true)
+            {
+                if (q.pop(temp))
+                    qinmo::println(temp, " i=", i.load(std::memory_order_relaxed));
+
+                Sleep(200);
+            }
+        }
+    );
+
+    Sleep(2500);
+    qinmo::println("main th begin:");
+    int temp = 0;
+    while (true)
+    {
+        if (q.pop(temp))
+            qinmo::println(temp, " i=", i.load(std::memory_order_relaxed));
+
+        Sleep(10);
+    }
+
     th1.join();
     th2.join();
+    th3.join();
+    th4.join();
 
     return 0;
 
