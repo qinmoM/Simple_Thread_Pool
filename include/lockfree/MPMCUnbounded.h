@@ -108,8 +108,8 @@ public:
             {
                 if (!seg->segment_->emplace(std::forward<Args>(args)...))
                 {
-                    seg->pushOwnership_.fetch_sub(1);
-                    return false;
+                    // what happen?
+                    std::exit(-1);
                 }
 
                 std::size_t count = seg->pushCount_.fetch_add(1) + 1;
@@ -118,7 +118,7 @@ public:
                     std::lock_guard<std::mutex> lock(mutex_);
 
                     seg->next_ = queues_.pop();
-                    tail_.store(seg->next_, std::memory_order_acquire);
+                    tail_.store(seg->next_, std::memory_order_release);
                 }
                 return true;
             }
