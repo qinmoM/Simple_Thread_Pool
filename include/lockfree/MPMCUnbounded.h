@@ -25,6 +25,12 @@ public:
         : blockSize_(blickSize)
     { }
 
+    ~SegmentQueue()
+    {
+        for (Segment<T, MPMCBoundedLockFree>* seg : queue_)
+            delete seg;
+    }
+
     void push(Segment<T, MPMCBoundedLockFree>* segment)
     {
         {
@@ -109,6 +115,14 @@ public:
 
             if (seg->pushOwnership_.compare_exchange_strong(ownership, ownership + 1))
             {
+                if (tail_.load(std::memory_order_acquire) != seg)
+                {
+                    seg->pushOwnership_.fetch_sub(1);
+                    seg = tail_.load(std::memory_order_acquire);
+                    ownership = seg->pushOwnership_.load(std::memory_order_acquire);
+                    continue;
+                }
+
                 if (!seg->segment_->emplace(std::forward<Args>(args)...))
                 {
                     // what happen?
@@ -118,10 +132,14 @@ public:
                 std::size_t count = seg->pushCount_.fetch_add(1) + 1;
                 if (count == blockSize_)
                 {
-                    std::lock_guard<std::mutex> lock(mutex_);
+                    {
+                        std::lock_guard<std::mutex> lock(mutex_);
 
-                    seg->next_ = queues_.pop();
-                    tail_.store(seg->next_, std::memory_order_release);
+                        seg->next_ = queues_.pop();
+                        tail_.store(seg->next_, std::memory_order_release);
+                    }
+
+                    cv_.notify_all();
                 }
                 return true;
             }
@@ -148,6 +166,14 @@ public:
 
             if (seg->popOwnership_.compare_exchange_strong(ownership, ownership + 1))
             {
+                if (head_.load(std::memory_order_acquire) != seg)
+                {
+                    seg->popOwnership_.fetch_sub(1);
+                    seg = head_.load(std::memory_order_acquire);
+                    ownership = seg->popOwnership_.load(std::memory_order_acquire);
+                    continue;
+                }
+
                 if (!seg->segment_->pop(val))
                 {
                     seg->popOwnership_.fetch_sub(1);
@@ -157,7 +183,9 @@ public:
                 std::size_t count = seg->popCount_.fetch_add(1) + 1;
                 if (count == blockSize_)
                 {
-                    std::lock_guard<std::mutex> lock(mutex_);
+                    std::unique_lock<std::mutex> lock(mutex_);
+
+                    cv_.wait(lock, [seg]() -> bool { return nullptr != seg->next_; });
 
                     head_.store(seg->next_, std::memory_order_release);
                     queues_.push(seg);
@@ -173,6 +201,7 @@ private:
     alignas(hardwareInterferenceSize) std::atomic<Segment<T, MPMCBoundedLockFree>*> tail_;
 
     std::mutex mutex_;
+    std::condition_variable cv_;
     const std::size_t blockSize_;
 
 };
