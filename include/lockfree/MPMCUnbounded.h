@@ -9,6 +9,8 @@ template <typename T, template <typename> class MPMCBoundedLockFree>
 struct Segment
 {
     std::unique_ptr<MPMCBoundedLockFree<T>> segment_ = nullptr;
+    std::atomic<std::size_t> pushOwnership_{ 0 };
+    std::atomic<std::size_t> popOwnership_{ 0 };
     Segment* next_ = nullptr;
 };
 
@@ -44,6 +46,7 @@ public:
 
             ret = queue_.back();
             ret->next_ = nullptr;
+            ret->sign_.store(0, std::memory_order_release);
             queue_.pop_back();
         }
 
@@ -64,7 +67,8 @@ class MPMCUnbounded
 {
 public:
     MPMCUnbounded(std::size_t blockSize)
-        : queues_(blockSize)
+        : blockSize_(blockSize)
+        , queues_(blockSize)
     {
         head_.store(queues_.pop(), std::memory_order_release);
         tail_.store(head_, std::memory_order_release);
@@ -115,27 +119,32 @@ public:
     bool pop(T& val)
     {
         Segment<T, MPMCBoundedLockFree>* seg = head_.load(std::memory_order_acquire);
+        std::size_t ownership = seg->popOwnership_.load(std::memory_order_acquire);
         while (true)
         {
-            if (seg->segment_->pop(val))
-                return true;
-
+            if (blockSize_ == ownership)
             {
-                std::lock_guard<std::mutex> lock(mutex_);
-                Segment<T, MPMCBoundedLockFree>* currSeg = head_.load(std::memory_order_acquire);
+                seg = head_.load(std::memory_order_acquire);
+                ownership = seg->popOwnership_.load(std::memory_order_acquire);
+                continue;
+            }
 
-                if (currSeg != seg)
+            if (seg->popOwnership_.compare_exchange_strong(ownership, ownership + 1))
+            {
+                if (!seg->segment_->pop(val))
                 {
-                    seg = currSeg;
-                    continue;
+                    seg->popOwnership_.fetch_sub(1);
+                    return false;
                 }
 
-                if (tail_.load(std::memory_order_acquire) == seg)
-                    return false;
+                if (ownership + 1 == blockSize_)
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
 
-                head_.store(seg->next_, std::memory_order_release);
-                queues_.push(seg);
-                seg = head_.load(std::memory_order_acquire);
+                    head_.store(seg->next_, std::memory_order_release);
+                    queues_.push(seg);
+                }
+                return true;
             }
         }
     }
@@ -146,5 +155,6 @@ private:
     std::atomic<Segment<T, MPMCBoundedLockFree>*> tail_;
 
     std::mutex mutex_;
+    const std::size_t blockSize_;
 
 };
