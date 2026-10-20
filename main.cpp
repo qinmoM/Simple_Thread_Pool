@@ -1,5 +1,6 @@
 #include "ThreadPool.hpp"
-#include "lockfree/MPMCUnbounded_false.h"
+// #include "lockfree/MPMCUnbounded_false.h"
+#include "lockfree/MPMCUnbounded.h"
 #include <iostream>
 #include <windows.h>
 
@@ -36,17 +37,17 @@ int main()
 
     // lock-free
     // qinmo::println("hello");
-
+    //
     // MPMCBounded<int> q(10);
     // while (true)
     // {
     //     for (int i = 0; i < 12; ++i)
     //         qinmo::println(q.push(i));
-
+    //
     //     int temp = 0;
     //     for (int i = 0; i < 12; ++i)
     //         qinmo::println(q.pop(temp), ' ', temp, '\t');
-
+    //
     //     Sleep(1000);
     // }
 
@@ -94,18 +95,22 @@ int main()
     //     if (!queue.push(i))
     //         qinmo::println("false");
     // }
-
+    //
     // int i = 0;
     // while (true)
     // {
     //     int temp = 0;
     //     if (!queue.pop(temp))
     //         break;
-
+    //
     //     qinmo::println(temp, " num=", ++i);
+    //
+    //     if (200 == i)
+    //         break;
     // }
 
-    qinmo::MPMCUnbounded_false<int> q(8);
+    // qinmo::MPMCUnbounded_false<int> q(8);
+    MPMCUnbounded<int> q(8);
     std::atomic<int> i{0};
     std::thread th1(
         [&]() -> void
@@ -137,7 +142,7 @@ int main()
             }
         }
     );
-
+    
     std::thread th4(
         [&]() -> void
         {
@@ -148,12 +153,12 @@ int main()
             {
                 if (q.pop(temp))
                     qinmo::println(temp, " i=", i.load(std::memory_order_relaxed));
-
+    
                 Sleep(200);
             }
         }
     );
-
+    
     Sleep(2500);
     qinmo::println("main th begin:");
     int temp = 0;
@@ -161,14 +166,25 @@ int main()
     {
         if (q.pop(temp))
             qinmo::println(temp, " i=", i.load(std::memory_order_relaxed));
-
-        Sleep(10);
+        else
+            qinmo::println("false");
+    
+        Sleep(100);
     }
-
+    
     th1.join();
     th2.join();
     th3.join();
     th4.join();
+
+
+    // MPMCUnbounded<int> queue(2);
+    // for (int i = 0; i < 3; ++i)
+    //     queue.push(i);
+    //
+    // int temp = -1;
+    // while (queue.pop(temp))
+    //     qinmo::println(temp);
 
     return 0;
 
