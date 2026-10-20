@@ -9,11 +9,11 @@ template <typename T, template <typename> class MPMCBoundedLockFree>
 struct Segment
 {
     std::unique_ptr<MPMCBoundedLockFree<T>> segment_ = nullptr;
-    std::atomic<std::size_t> pushOwnership_{ 0 };
-    std::atomic<std::size_t> pushCount_{ 0 };
-    std::atomic<std::size_t> popOwnership_{ 0 };
-    std::atomic<std::size_t> popCount_{ 0 };
     Segment* next_ = nullptr;
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> pushOwnership_{ 0 };
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> pushCount_{ 0 };
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> popOwnership_{ 0 };
+    alignas(hardwareInterferenceSize) std::atomic<std::size_t> popCount_{ 0 };
 };
 
 
@@ -89,6 +89,9 @@ public:
             curr = curr->next_;
         }
     }
+
+    MPMCUnbounded(const MPMCUnbounded&) = delete;
+    MPMCUnbounded& operator=(const MPMCUnbounded&) = delete;
 
     template <typename... Args>
     bool emplace(Args&&... args)
@@ -166,8 +169,8 @@ public:
 
 private:
     SegmentQueue<T, MPMCBoundedLockFree> queues_;
-    std::atomic<Segment<T, MPMCBoundedLockFree>*> head_;
-    std::atomic<Segment<T, MPMCBoundedLockFree>*> tail_;
+    alignas(hardwareInterferenceSize) std::atomic<Segment<T, MPMCBoundedLockFree>*> head_;
+    alignas(hardwareInterferenceSize) std::atomic<Segment<T, MPMCBoundedLockFree>*> tail_;
 
     std::mutex mutex_;
     const std::size_t blockSize_;
